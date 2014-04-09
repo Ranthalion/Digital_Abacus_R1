@@ -11,34 +11,36 @@
 #define TEAL 0x6	//ASCII
 #define WHITE 0x7 	//display and Menu
 
-#define DISPLAY 0x2
-#define AND 0x3
-#define OR 0x4
-#define XOR 0x5
-#define ASCII 0x6
-#define MENU 0x7
+#define DISPLAY_MODE 2
+#define AND_MODE 3
+#define OR_MODE 4
+#define XOR_MODE 5
+#define ASCII_MODE 6
+#define MENU_MODE 7
 
 #define INITIAL 0x0	
 #define REDRAW 	0x1
 #define WAITING 0x2
-#define Incorrect 0x3
-#define Success  0x4
+#define INCORRECT 0x3
+#define SUCCESS  0x4
 
-byte currentMode = DISPLAY;
-byte currentOption = DISPLAY;
+volatile int currentMode = DISPLAY_MODE;
+int currentOption = DISPLAY_MODE;
 boolean optionChanged = false;
 
-byte state = INITIAL;
+int state = INITIAL;
 int num1;
 int num2;
 int answer;
-
+const int colors [] = {0,0,7,3,6,5,6};
 const String menu[] = {"", "", "DISPLAY", "AND", "OR", "XOR", "ASCII"};
 const byte abacusPins[] = {2, 3, 4, 5, 6, 7, 8, 9};
 
 Adafruit_RGBLCDShield lcd = Adafruit_RGBLCDShield();
 
 void setup(){
+  randomSeed(analogRead(0));
+  
   // Set each pin connected to the Abacus switches as an input
   for(int i = 0; i < 8; i++)
   {
@@ -51,8 +53,9 @@ void setup(){
   //Initiate LCD
   lcd.begin(16,2);
   lcd.setBacklight(WHITE);
-  lcdDisplay("     FlipBit", " by DREAM TEAM");
+  lcdDisplay("   FlipBit", " by DREAM TEAM");
   delay(1500);
+  randomSeed(random(0,1000) * analogRead(0));
 }
 
 void loop(){
@@ -63,8 +66,8 @@ void loop(){
   {
     Serial.println("Pressed up.");
     lcd.clear();
-	lcd.setBacklight(WHITE)
-    currentMode = MENU;
+    lcd.setBacklight(WHITE);
+    currentMode = MENU_MODE;
     optionChanged = true;
     currentOption--;    
     if (currentOption <= 0x1)
@@ -75,8 +78,8 @@ void loop(){
   {
     Serial.println("Pressed down.");
     lcd.clear();
-	lcd.setBacklight(WHITE)
-    currentMode = MENU;
+    lcd.setBacklight(WHITE);
+    currentMode = MENU_MODE;
     optionChanged = true;
     currentOption++;
     if (currentOption >= 0x7)
@@ -86,28 +89,31 @@ void loop(){
   
   switch(currentMode)
   {
-    case MENU:
+    case MENU_MODE:
       displayMenu(buttons);
       break;
-    case DISPLAY: 
+    case DISPLAY_MODE: 
       displayNumbers();
       break;
-    case AND:
-    case OR:
-    case XOR:      
-    case ASCII:      
+    case AND_MODE:
+    case OR_MODE:
+    case XOR_MODE:      
+    case ASCII_MODE:      
 	  runGame(buttons);
       break;
     default:
+      Serial.print("Default in main loop.  ");
+      Serial.println(currentMode);
       break;    
   }
+  
 }
 
 void displayMenu(uint8_t buttons)
 {  
   if (optionChanged)
   {
-	optionChanged = false;
+    optionChanged = false;
     int next = currentOption+1;
     if (next > 6)
       next = 2;    
@@ -122,91 +128,92 @@ void displayMenu(uint8_t buttons)
   }
   if (buttons & BUTTON_SELECT)
   {
-	currentMode = currentOption;
-	state = 0;
-  }
+    currentMode = currentOption;
+    state = INITIAL;
+    delay(250);
+   }
 }
 
 void displayNumbers()
 {
-  if (state == 0)
+  if (state == INITIAL)
   {
-	state = 1;
-	lcd.setBacklight(WHITE)
-	lcd.clear();
+    state = WAITING;
+    lcd.setBacklight(WHITE);
+    lcd.clear();
   }
   byte input = readAbacus();
   
   char line1[16];
   char line2[16];
   char tmp[9];
-  Serial.println(input);
-
+  
   toBinary(tmp, input);
   sprintf(line1, "0b %8s %4c", tmp, input);
   sprintf(line2, "0x %02X %10d", input, input);
   
   lcdDisplay(line1, line2);
-  
 }
-
-
 
 void runGame(uint8_t buttons)
 {
-   /* States
-	0 - Initial 	(Create 2 Random numbers and calculated expected Answer) -> REDRAW
-	1 - REDRAW 	(Display the numbers and change the screen color) -> Waiting
-	2 - Waiting 	(Wait for button select to be pressed) -> Wrong, Success
-	3 - Incorrect	(Display Try Again message and change screen color, wait for millis or button click) -> REDRAW
-	4 - Success 	(Display Success message and change screen color) -> Initial
-  */
   switch (state)
   {
-	case INITIAL:
-		num1 = Rand(255);
-		num2 = Rand(255);
-		switch(currentMode)
-		{
-			case AND:
-				answer = num1 & num2;
-				break;
-			case OR:
-				answer = num1 | num2;
-				break;
-			case XOR:
-				answer = num1 ^ num2;
-				break;
-			default:
-				break;
-		}
-		state = REDRAW;
-		break;
-	case REDRAW:
-		char byte1[9];
-		char byte2[9];
-		char line1[16];
-		char line2[16];
-		
-		toBinary(byte1, num1);
-		toBinary(byte2, num2);
-		
-		sprintf(line1, "    %8s", byte1);
-		sprintf(line2, "%3s %8s", menu[currentMode], byte2);
-		lcd.setBacklight(currentMode);
-		lcd.clear();
-		lcdDisplay(line1, line2);
-		state = WAITING;
-		break;
-	case WAITING:
-		if (buttons & BUTTON_SELECT)
-		{
-			byte input = readAbacus();
-			if (input == answer)
-				state = SUCCESS;
-			else
-				state = INCORRECT;
-			delay(250);
+    case INITIAL:
+      num1 = random(255);
+      num2 = random(255);
+      switch(currentMode)
+      {
+        case AND_MODE:
+          answer = num1 & num2;
+	  break;
+	case OR_MODE:
+          answer = num1 | num2;
+	  break;
+	case XOR_MODE:
+	  answer = num1 ^ num2;
+          break;
+        case ASCII_MODE:
+          num1 = random(65, 123);
+          answer = num1;
+          break;
+	default:
+	  break;
+      }
+      state = REDRAW;
+      break;
+    case REDRAW:
+      char byte1[9];
+      char byte2[9];
+      char line1[16];
+      char line2[16];
+
+      if (currentMode == ASCII_MODE)
+      {
+        sprintf(line1, "Identify binary for ");
+        sprintf(line1, "ASCII Character %c", num1);
+      }
+      else
+      {
+        toBinary(byte1, num1);
+        toBinary(byte2, num2);
+        sprintf(line1, "    %8s", byte1);
+        sprintf(line2, "%3s %8s", menu[currentMode].c_str(), byte2);
+      }
+      lcd.setBacklight(colors[currentMode]);
+      lcd.clear();
+      lcdDisplay(line1, line2);
+      state = WAITING;
+      break;
+    case WAITING:
+      if (buttons & BUTTON_SELECT)
+      {
+        byte input = readAbacus();
+	if (input == answer)
+          state = SUCCESS;
+        else
+          state = INCORRECT;
+          delay(250);
 		}
 		break;
 	case INCORRECT:
@@ -224,6 +231,7 @@ void runGame(uint8_t buttons)
 		state = INITIAL;
 		break;
 	default:
+          Serial.println("Stuck in default in Game");
 		break;	
   }
 }
