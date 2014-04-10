@@ -16,7 +16,8 @@
 #define OR_MODE 4
 #define XOR_MODE 5
 #define ASCII_MODE 6
-#define MENU_MODE 7
+#define NUMBERS_MODE 7
+#define MENU_MODE 8
 
 #define INITIAL 0x0	
 #define REDRAW 	0x1
@@ -32,8 +33,8 @@ int state = INITIAL;
 int num1;
 int num2;
 int answer;
-const int colors [] = {0,0,7,3,6,5,6};
-const String menu[] = {"", "", "DISPLAY", "AND", "OR", "XOR", "ASCII"};
+const int colors [] = {0,0,7,3,6,5,6,3};
+const String menu[] = {"", "", "DISPLAY", "AND", "OR", "XOR", "ASCII", "NUMBERS"};
 const byte abacusPins[] = {2, 3, 4, 5, 6, 7, 8, 9};
 
 Adafruit_RGBLCDShield lcd = Adafruit_RGBLCDShield();
@@ -71,7 +72,7 @@ void loop(){
     optionChanged = true;
     currentOption--;    
     if (currentOption <= 0x1)
-      currentOption = 0x6;
+      currentOption = 0x7;
     delay(250);
   }
   else if (buttons & BUTTON_DOWN)
@@ -82,7 +83,7 @@ void loop(){
     currentMode = MENU_MODE;
     optionChanged = true;
     currentOption++;
-    if (currentOption >= 0x7)
+    if (currentOption >= 0x8)
       currentOption = 0x2;
     delay(250);
   }
@@ -99,6 +100,7 @@ void loop(){
     case OR_MODE:
     case XOR_MODE:      
     case ASCII_MODE:      
+    case NUMBERS_MODE:
 	  runGame(buttons);
       break;
     default:
@@ -115,7 +117,7 @@ void displayMenu(uint8_t buttons)
   {
     optionChanged = false;
     int next = currentOption+1;
-    if (next > 6)
+    if (next > 7)
       next = 2;    
 	  
     lcd.clear(); 
@@ -177,7 +179,10 @@ void runGame(uint8_t buttons)
           num1 = random(65, 123);
           answer = num1;
           break;
-	default:
+        case NUMBERS_MODE:
+          answer = num1;
+          break;
+      	default:
 	  break;
       }
       state = REDRAW;
@@ -191,7 +196,12 @@ void runGame(uint8_t buttons)
       if (currentMode == ASCII_MODE)
       {
         sprintf(line1, "Identify binary for ");
-        sprintf(line1, "ASCII Character %c", num1);
+        sprintf(line2, "ASCII:   %c", num1);
+      }
+      else if (currentMode == NUMBERS_MODE)
+      {
+        sprintf(line1, "Identify binary for ");
+        sprintf(line2, "decimal: %d", num1);
       }
       else
       {
